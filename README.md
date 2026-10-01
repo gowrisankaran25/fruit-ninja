@@ -110,7 +110,6 @@ fruit ninja/
 ```
 
 ---
-
 ## 🔬 Mathematical & Algorithm Specifications
 
 ### 1. Chaikin's Corner-Cutting Curve Smoothing
