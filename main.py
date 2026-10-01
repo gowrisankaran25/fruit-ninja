@@ -850,9 +850,9 @@ class FruitNinjaGame:
             self.screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH // 2, 475 + i * 26)))
 
         if self._hand_detected_frames > 20:
-            status = self.font_medium.render("✓ Hand Detected — Ready!", True, Colors.GREEN)
+            status = self.font_medium.render("Hand Detected - Ready!", True, Colors.GREEN)
         else:
-            status = self.font_medium.render("🔍 Searching for hand...", True, Colors.YELLOW)
+            status = self.font_medium.render("Searching for hand...", True, Colors.YELLOW)
         self.screen.blit(status, status.get_rect(center=(SCREEN_WIDTH // 2, 565)))
 
         elapsed = time.time() - self._calibration_start
