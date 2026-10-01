@@ -17,10 +17,9 @@
 
   <style>
     :root {
-      --bg-gradient: radial-gradient(circle at center, #1a1528 0%, #0d0914 100%);
-      --glass-bg: rgba(22, 18, 36, 0.85);
-      --glass-border: rgba(255, 255, 255, 0.18);
-      --glass-glow: rgba(0, 240, 255, 0.3);
+      --bg-gradient: radial-gradient(circle at center, #1b1330 0%, #0c0816 100%);
+      --glass-bg: rgba(18, 14, 32, 0.85);
+      --glass-border: rgba(255, 255, 255, 0.15);
       
       --primary-cyan: #00f0ff;
       --primary-magenta: #ff007f;
@@ -58,7 +57,6 @@
       align-items: center;
     }
 
-    /* Hidden Camera Stream */
     #webcam {
       position: absolute;
       width: 1px;
@@ -67,7 +65,6 @@
       pointer-events: none;
     }
 
-    /* Canvas Element */
     #gameCanvas {
       position: absolute;
       top: 0;
@@ -77,7 +74,6 @@
       z-index: 1;
     }
 
-    /* UI Overlay Container */
     .ui-layer {
       position: absolute;
       top: 0;
@@ -98,57 +94,131 @@
       display: none !important;
     }
 
-    /* Glassmorphism Common Style */
-    .glass-card {
-      background: var(--glass-bg);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--glass-border);
-      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-      border-radius: 28px;
-      padding: 2.5rem;
-      text-align: center;
-      color: var(--text-main);
+    /* Pygame-Matched Main Title Box */
+    .pygame-title-box {
+      background: rgba(25, 20, 48, 0.75);
+      border: 2px solid rgba(100, 130, 255, 0.4);
+      box-shadow: 0 0 30px rgba(0, 240, 255, 0.2), inset 0 0 15px rgba(255, 255, 255, 0.05);
+      border-radius: 24px;
+      padding: 0.8rem 3.5rem;
+      margin-bottom: 2.5rem;
+      backdrop-filter: blur(12px);
     }
 
-    /* Buttons */
-    .btn {
-      display: inline-block;
+    .pygame-title-box h1 {
+      font-size: 3.8rem;
+      font-weight: 900;
+      letter-spacing: 3px;
+      color: #ffffff;
+      text-shadow: 0 0 25px rgba(0, 240, 255, 0.7);
+    }
+
+    /* Pygame Button Layout */
+    .menu-actions-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.2rem;
+      width: 100%;
+    }
+
+    .btn-pygame {
+      width: 380px;
+      max-width: 85vw;
+      height: 60px;
       font-family: var(--font-family);
-      font-size: 1.1rem;
-      font-weight: 800;
-      letter-spacing: 1px;
-      padding: 1rem 2.2rem;
-      border-radius: 50px;
-      border: none;
+      font-size: 1.35rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      border-radius: 20px;
+      background: rgba(18, 14, 32, 0.7);
+      color: #ffffff;
       cursor: pointer;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       text-transform: uppercase;
+      backdrop-filter: blur(10px);
     }
 
-    .btn-primary {
-      background: linear-gradient(135deg, var(--primary-cyan) 0%, #0088ff 100%);
-      color: #0d0914;
-      box-shadow: 0 4px 25px rgba(0, 240, 255, 0.5);
+    /* Colors matched 1:1 with Pygame local window */
+    .btn-play {
+      border: 2px solid var(--accent-green);
+      box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+    }
+    .btn-play:hover {
+      background: rgba(0, 255, 136, 0.18);
+      box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+      transform: translateY(-2px) scale(1.02);
     }
 
-    .btn-primary:hover {
-      transform: translateY(-3px) scale(1.03);
-      box-shadow: 0 8px 35px rgba(0, 240, 255, 0.7);
+    .btn-modes {
+      border: 2px solid #2288ff;
+      box-shadow: 0 0 15px rgba(0, 136, 255, 0.2);
+    }
+    .btn-modes:hover {
+      background: rgba(0, 136, 255, 0.18);
+      box-shadow: 0 0 30px rgba(0, 136, 255, 0.5);
+      transform: translateY(-2px) scale(1.02);
     }
 
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.08);
-      color: #fff;
-      border: 1px solid var(--glass-border);
+    .btn-achieve {
+      border: 2px solid var(--accent-gold);
+      box-shadow: 0 0 15px rgba(255, 183, 0, 0.2);
+    }
+    .btn-achieve:hover {
+      background: rgba(255, 183, 0, 0.18);
+      box-shadow: 0 0 30px rgba(255, 183, 0, 0.5);
+      transform: translateY(-2px) scale(1.02);
     }
 
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.18);
-      transform: translateY(-2px);
+    .btn-exit {
+      border: 2px solid var(--danger-red);
+      box-shadow: 0 0 15px rgba(255, 51, 102, 0.2);
+    }
+    .btn-exit:hover {
+      background: rgba(255, 51, 102, 0.18);
+      box-shadow: 0 0 30px rgba(255, 51, 102, 0.5);
+      transform: translateY(-2px) scale(1.02);
     }
 
-    /* HUD Header Bar */
+    /* Bottom Status Bar - Matched 1:1 with Pygame Window */
+    .pygame-bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 52px;
+      background: rgba(10, 7, 18, 0.85);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 2rem;
+      z-index: 100;
+      font-size: 0.95rem;
+      font-weight: 800;
+    }
+
+    .status-left {
+      color: var(--accent-green);
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .status-center {
+      color: var(--text-dim);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .status-right {
+      color: var(--primary-cyan);
+      letter-spacing: 1.5px;
+    }
+
+    /* HUD Overlay Top Bar */
     #hud-overlay {
       padding: 1.5rem 2rem;
     }
@@ -273,90 +343,25 @@
       100% { transform: translateX(-50%) scale(1); opacity: 1; }
     }
 
-    .input-badge {
-      position: absolute;
-      bottom: 1.5rem;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(13, 9, 20, 0.85);
-      backdrop-filter: blur(10px);
+    /* Glass Cards for Modals */
+    .glass-card {
+      background: rgba(18, 14, 32, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--glass-border);
-      padding: 0.6rem 1.4rem;
-      border-radius: 30px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: var(--text-dim);
+      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.6);
+      border-radius: 28px;
+      padding: 2.5rem;
+      text-align: center;
+      color: var(--text-main);
     }
 
-    .key-hint {
-      color: var(--primary-cyan);
-      font-weight: 600;
-      margin-left: 0.3rem;
-    }
-
-    /* Modals */
     .modal-screen {
       display: flex;
       justify-content: center;
       align-items: center;
-      background: rgba(9, 6, 15, 0.75);
-      backdrop-filter: blur(10px);
-    }
-
-    .main-menu-card {
-      width: 480px;
-      max-width: 90vw;
-    }
-
-    .brand-title {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.6rem;
-      margin-bottom: 0.3rem;
-    }
-
-    .brand-icon {
-      font-size: 2.8rem;
-    }
-
-    .brand-title h1 {
-      font-size: 3rem;
-      font-weight: 900;
-      letter-spacing: 2px;
-      background: linear-gradient(135deg, #ffffff 0%, var(--primary-cyan) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .brand-subtitle {
-      font-size: 0.9rem;
-      color: var(--text-dim);
-      margin-bottom: 2rem;
-    }
-
-    .menu-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      margin-bottom: 2rem;
-    }
-
-    .controls-guide {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 16px;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-      color: var(--text-dim);
-      text-align: left;
-    }
-
-    .controls-guide span {
-      font-weight: 700;
-      color: #fff;
+      background: rgba(9, 6, 15, 0.6);
+      backdrop-filter: blur(8px);
     }
 
     /* Mode Select Grid */
@@ -508,13 +513,47 @@
 </head>
 <body>
   <div id="app-container">
-    <!-- Camera Video (Hidden / Mirror Layer) -->
+    <!-- Camera Video -->
     <video id="webcam" autoplay playsinline muted></video>
 
     <!-- Main Game Canvas -->
     <canvas id="gameCanvas"></canvas>
 
-    <!-- Glassmorphic HUD -->
+    <!-- Pygame-Matched Main Menu Screen -->
+    <div id="menu-screen" class="ui-layer modal-screen active">
+      <div style="display: flex; flex-direction: column; align-items: center;">
+        
+        <!-- Pygame Header Plate -->
+        <div class="pygame-title-box">
+          <h1>FRUIT NINJA</h1>
+        </div>
+
+        <!-- Pygame Stacked Button Menu -->
+        <div class="menu-actions-stack">
+          <button id="btn-start" class="btn-pygame btn-play">PLAY</button>
+          <button id="btn-mode-select" class="btn-pygame btn-modes">GAME MODES</button>
+          <button id="btn-achievements" class="btn-pygame btn-achieve">ACHIEVEMENTS</button>
+          <button id="btn-exit" class="btn-pygame btn-exit">EXIT</button>
+        </div>
+
+      </div>
+
+      <!-- Pygame Bottom Status Bar -->
+      <div class="pygame-bottom-bar">
+        <div class="status-left">
+          <span style="display: inline-block; width: 10px; height: 10px; background: #00ff88; border-radius: 50%; box-shadow: 0 0 8px #00ff88;"></span>
+          <span id="status-camera">CAMERA: READY</span>
+        </div>
+        <div class="status-center">
+          Press TAB to toggle mouse control
+        </div>
+        <div class="status-right" id="status-input">
+          HAND TRACKING
+        </div>
+      </div>
+    </div>
+
+    <!-- Glassmorphic In-Game HUD -->
     <div id="hud-overlay" class="ui-layer hidden">
       <div class="hud-top-bar">
         <div class="hud-score-card">
@@ -537,9 +576,7 @@
             <span class="hud-sublabel">BEST</span>
             <span id="hud-best-score" class="hud-subvalue">0</span>
           </div>
-          <div id="hud-lives-container" class="hud-lives">
-            <!-- Dynamic Hearts -->
-          </div>
+          <div id="hud-lives-container" class="hud-lives"></div>
           <div id="hud-timer-card" class="hud-timer hidden">
             <span class="hud-label">TIME</span>
             <span id="hud-timer-value" class="hud-value">60</span>
@@ -547,36 +584,21 @@
         </div>
       </div>
 
-      <!-- Combo & Powerup Badges -->
       <div id="hud-combo-banner" class="combo-banner hidden">
         <span id="hud-combo-text">3x COMBO!</span>
       </div>
-      <div id="hud-powerup-bar" class="powerup-bar"></div>
-      
-      <div id="hud-input-badge" class="input-badge">
-        🖐️ HAND TRACKING <span class="key-hint">(Press TAB to toggle Mouse)</span>
-      </div>
-    </div>
 
-    <!-- Main Menu Screen -->
-    <div id="menu-screen" class="ui-layer modal-screen active">
-      <div class="glass-card main-menu-card">
-        <div class="brand-title">
-          <span class="brand-icon">🍉</span>
-          <h1>FRUIT NINJA</h1>
+      <!-- In-Game Bottom Status Bar -->
+      <div class="pygame-bottom-bar">
+        <div class="status-left">
+          <span style="display: inline-block; width: 10px; height: 10px; background: #00ff88; border-radius: 50%; box-shadow: 0 0 8px #00ff88;"></span>
+          <span id="hud-status-camera">CAMERA: READY</span>
         </div>
-        <p class="brand-subtitle">AI Gesture Edition • Real-Time Hand Tracking</p>
-
-        <div class="menu-actions">
-          <button id="btn-start" class="btn btn-primary btn-glow">PLAY GAME</button>
-          <button id="btn-mode-select" class="btn btn-secondary">GAME MODES</button>
-          <button id="btn-achievements" class="btn btn-secondary">ACHIEVEMENTS</button>
+        <div class="status-center">
+          Press TAB to toggle mouse control
         </div>
-
-        <div class="controls-guide">
-          <div class="guide-item"><span>🖐️ Index Finger</span> Point & Swipe to Slice</div>
-          <div class="guide-item"><span>✋ Open Palm</span> Pause / Resume</div>
-          <div class="guide-item"><span>⌨️ TAB Key</span> Switch to Mouse Control</div>
+        <div class="status-right" id="hud-status-input">
+          HAND TRACKING
         </div>
       </div>
     </div>
@@ -607,7 +629,7 @@
             <p>1 Life Only • Faster Fruit Spawns • High Stakes</p>
           </div>
         </div>
-        <button id="btn-mode-back" class="btn btn-secondary mt-4">BACK TO MENU</button>
+        <button id="btn-mode-back" class="btn-pygame btn-modes" style="width: 250px; height: 48px; font-size: 1rem; margin-top: 1rem;">BACK TO MENU</button>
       </div>
     </div>
 
@@ -616,7 +638,7 @@
       <div class="glass-card achievements-card">
         <h2>🏆 ACHIEVEMENTS</h2>
         <div id="achievements-list" class="achievements-grid"></div>
-        <button id="btn-achievements-back" class="btn btn-secondary mt-4">BACK TO MENU</button>
+        <button id="btn-achievements-back" class="btn-pygame btn-modes" style="width: 250px; height: 48px; font-size: 1rem; margin-top: 1rem;">BACK TO MENU</button>
       </div>
     </div>
 
@@ -645,8 +667,8 @@
         </div>
 
         <div class="gameover-actions">
-          <button id="btn-restart" class="btn btn-primary btn-glow">REPLAY (R)</button>
-          <button id="btn-main-menu" class="btn btn-secondary">MAIN MENU (M)</button>
+          <button id="btn-restart" class="btn-pygame btn-play" style="width: 180px; height: 48px; font-size: 1rem;">REPLAY (R)</button>
+          <button id="btn-main-menu" class="btn-pygame btn-modes" style="width: 180px; height: 48px; font-size: 1rem;">MENU (M)</button>
         </div>
       </div>
     </div>
@@ -655,10 +677,10 @@
     <div id="pause-screen" class="ui-layer modal-screen hidden">
       <div class="glass-card pause-card">
         <h2>GAME PAUSED</h2>
-        <p>Show open palm or press ESC to resume</p>
+        <p style="margin-top: 0.5rem; color: #a09ab5;">Show open palm or press ESC to resume</p>
         <div class="pause-actions mt-4">
-          <button id="btn-resume" class="btn btn-primary">RESUME</button>
-          <button id="btn-pause-menu" class="btn btn-secondary">QUIT TO MENU</button>
+          <button id="btn-resume" class="btn-pygame btn-play" style="width: 160px; height: 48px; font-size: 1rem;">RESUME</button>
+          <button id="btn-pause-menu" class="btn-pygame btn-exit" style="width: 160px; height: 48px; font-size: 1rem;">QUIT</button>
         </div>
       </div>
     </div>

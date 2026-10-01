@@ -1,6 +1,7 @@
 /**
  * FRUIT NINJA - HTML5 Web Application Engine
  * Real-time MediaPipe Hand Tracking, Chaikin Blade Trail, Line-Segment Collision
+ * Matched 1:1 with Pygame Local Application UI & Physics
  */
 
 // Global State
@@ -94,9 +95,24 @@ let isMouseDown = false;
 
 // Entities
 let fruits = [];
+let menuBackgroundFruits = [];
 let slicedHalves = [];
 let particles = [];
 let popups = [];
+
+// Initialize Menu Background Floating Fruits
+for (let i = 0; i < 8; i++) {
+  menuBackgroundFruits.push({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    radius: 35 + Math.random() * 25,
+    color: FRUIT_TYPES[Math.floor(Math.random() * FRUIT_TYPES.length)].color,
+    vx: (Math.random() - 0.5) * 60,
+    vy: (Math.random() - 0.5) * 60,
+    rot: Math.random() * Math.PI * 2,
+    vRot: (Math.random() - 0.5) * 2
+  });
+}
 
 // DOM Elements
 const menuScreen = document.getElementById('menu-screen');
@@ -116,7 +132,11 @@ const hudTimerCard = document.getElementById('hud-timer-card');
 const hudTimerValue = document.getElementById('hud-timer-value');
 const hudComboBanner = document.getElementById('hud-combo-banner');
 const hudComboText = document.getElementById('hud-combo-text');
-const hudInputBadge = document.getElementById('hud-input-badge');
+
+const statusInput = document.getElementById('status-input');
+const hudStatusInput = document.getElementById('hud-status-input');
+const statusCamera = document.getElementById('status-camera');
+const hudStatusCamera = document.getElementById('hud-status-camera');
 
 hudBestScore.innerText = bestScore;
 
@@ -129,7 +149,6 @@ const achievements = [
   { id: 'zen_master', title: 'Zen Master', desc: 'Complete a Zen Mode session', unlocked: false, icon: '🧘' }
 ];
 
-// Load saved achievements
 const savedAch = JSON.parse(localStorage.getItem('fn_achievements') || '[]');
 achievements.forEach(a => {
   if (savedAch.includes(a.id)) a.unlocked = true;
@@ -187,7 +206,6 @@ function segmentHitsCircle(p1, p2, circle) {
 
 // MediaPipe Camera & Hand Landmark Initialization
 const videoElement = document.getElementById('webcam');
-let camera = null;
 
 if (typeof Hands !== 'undefined') {
   const hands = new Hands({
@@ -203,7 +221,7 @@ if (typeof Hands !== 'undefined') {
 
   hands.onResults(onHandResults);
 
-  camera = new Camera(videoElement, {
+  const camera = new Camera(videoElement, {
     onFrame: async () => {
       await hands.send({ image: videoElement });
     },
@@ -211,8 +229,13 @@ if (typeof Hands !== 'undefined') {
     height: 480
   });
 
-  camera.start().catch(err => {
+  camera.start().then(() => {
+    if (statusCamera) statusCamera.innerText = 'CAMERA: READY';
+    if (hudStatusCamera) hudStatusCamera.innerText = 'CAMERA: READY';
+  }).catch(err => {
     console.warn("Webcam permission denied or camera missing. Defaulting to Mouse mode.", err);
+    if (statusCamera) statusCamera.innerText = 'CAMERA: MOUSE MODE';
+    if (hudStatusCamera) hudStatusCamera.innerText = 'CAMERA: MOUSE MODE';
     inputMode = 'MOUSE';
     updateInputBadge();
   });
@@ -227,20 +250,16 @@ function onHandResults(results) {
     updateInputBadge();
     const landmarks = results.multiHandLandmarks[0];
 
-    // Index fingertip landmark (#8)
     const rawX = (1 - landmarks[8].x) * width; // Mirror X
     const rawY = landmarks[8].y * height;
 
     addTrailPoint(rawX, rawY);
 
-    // Gesture detection: Open palm (Thumb #4 and Pinky #20 far apart)
-    const wrist = landmarks[0];
     const indexTip = landmarks[8];
     const pinkyTip = landmarks[20];
     const handSpan = Math.hypot(pinkyTip.x - indexTip.x, pinkyTip.y - indexTip.y);
 
     if (handSpan > 0.4 && gameState === 'PLAYING') {
-      // Pause gesture
       pauseGame();
     }
   }
@@ -283,9 +302,9 @@ window.addEventListener('keydown', (e) => {
 });
 
 function updateInputBadge() {
-  hudInputBadge.innerHTML = inputMode === 'HAND' 
-    ? '🖐️ HAND TRACKING <span class="key-hint">(Press TAB to toggle Mouse)</span>'
-    : '🖱️ MOUSE MODE <span class="key-hint">(Press TAB to toggle Hand)</span>';
+  const text = inputMode === 'HAND' ? 'HAND TRACKING' : 'MOUSE MODE';
+  if (statusInput) statusInput.innerText = text;
+  if (hudStatusInput) hudStatusInput.innerText = text;
 }
 
 function addTrailPoint(x, y) {
@@ -305,7 +324,6 @@ class Fruit {
     this.isPowerup = typeObj.isPowerup || false;
     this.special = typeObj.special || false;
 
-    // Spawning position & physics
     this.x = width * (0.15 + Math.random() * 0.7);
     this.y = height + this.radius + 10;
     
@@ -315,7 +333,7 @@ class Fruit {
 
     this.vx = vx * 0.95;
     this.vy = vy;
-    this.gravity = 650; // px/s^2
+    this.gravity = 650;
     this.rotation = Math.random() * Math.PI * 2;
     this.vRot = (Math.random() - 0.5) * 4;
     this.active = true;
@@ -329,7 +347,6 @@ class Fruit {
 
     if (this.y > height + this.radius + 50 && this.vy > 0) {
       this.active = false;
-      // Miss penalty in Classic & Survival
       if (!this.isBomb && !this.isPowerup && gameState === 'PLAYING') {
         if (currentMode === 'classic' || currentMode === 'survival') {
           lives--;
@@ -346,7 +363,6 @@ class Fruit {
     ctx.rotate(this.rotation);
 
     if (this.isBomb) {
-      // Draw Fuse Bomb
       ctx.beginPath();
       ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
       ctx.fillStyle = '#111122';
@@ -355,7 +371,6 @@ class Fruit {
       ctx.strokeStyle = '#ff3366';
       ctx.stroke();
 
-      // Sparkle fuse
       ctx.beginPath();
       ctx.moveTo(0, -this.radius);
       ctx.quadraticCurveTo(10, -this.radius - 10, 15, -this.radius - 18);
@@ -368,7 +383,6 @@ class Fruit {
       ctx.fillStyle = '#ffff00';
       ctx.fill();
     } else {
-      // Draw Fruit Body
       ctx.beginPath();
       ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
       ctx.fillStyle = this.color;
@@ -377,14 +391,12 @@ class Fruit {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
       ctx.stroke();
 
-      // Inner Highlight / Details
       ctx.beginPath();
       ctx.arc(-this.radius * 0.3, -this.radius * 0.3, this.radius * 0.35, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
       ctx.fill();
 
       if (this.special) {
-        // Golden glow
         ctx.shadowColor = '#ffd700';
         ctx.shadowBlur = 20;
       }
@@ -403,7 +415,7 @@ class SlicedHalf {
     this.color = color;
     this.juice = juice;
     this.rotation = angle;
-    this.side = side; // -1 for left, 1 for right
+    this.side = side;
 
     this.vx = side * (100 + Math.random() * 150);
     this.vy = -(150 + Math.random() * 100);
@@ -482,12 +494,10 @@ class Particle {
   }
 }
 
-// Score Popups
 function showPopup(text, x, y, color = '#ffffff') {
   popups.push({ text, x, y, color, alpha: 1.0, vy: -60 });
 }
 
-// Game Spawner Loop
 let spawnTimer = 0;
 
 function updateSpawner(dt) {
@@ -499,7 +509,6 @@ function updateSpawner(dt) {
     const count = 1 + Math.floor(Math.random() * (level > 3 ? 3 : 2));
     for (let i = 0; i < count; i++) {
       if (currentMode === 'classic' && Math.random() < 0.25) {
-        // Spawn Bomb
         fruits.push(new Fruit({ name: 'bomb', color: '#111', juice: '#f00', radius: 32, score: 0, isBomb: true }));
       } else {
         const randType = FRUIT_TYPES[Math.floor(Math.random() * FRUIT_TYPES.length)];
@@ -516,13 +525,41 @@ function gameLoop(time) {
 
   ctx.clearRect(0, 0, width, height);
 
-  // Clear expired trail points
   const now = performance.now();
   rawTrail = rawTrail.filter(p => now - p.time < 200);
   smoothedTrail = chaikinSmoothing(rawTrail, 2);
 
+  // Render Background Floating Fruits on Menu Screen (Pygame Match)
+  if (gameState === 'MENU' || gameState === 'MODE_SELECT' || gameState === 'ACHIEVEMENTS') {
+    menuBackgroundFruits.forEach(bf => {
+      bf.x += bf.vx * dt;
+      bf.y += bf.vy * dt;
+      bf.rot += bf.vRot * dt;
+
+      if (bf.x < 0 || bf.x > width) bf.vx *= -1;
+      if (bf.y < 0 || bf.y > height) bf.vy *= -1;
+
+      ctx.save();
+      ctx.translate(bf.x, bf.y);
+      ctx.rotate(bf.rot);
+      ctx.beginPath();
+      ctx.arc(0, 0, bf.radius, 0, Math.PI * 2);
+      ctx.fillStyle = bf.color;
+      ctx.globalAlpha = 0.45;
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(-bf.radius * 0.3, -bf.radius * 0.3, bf.radius * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
   if (gameState === 'PLAYING') {
-    // Mode timer
     if (currentMode === 'arcade' || currentMode === 'zen') {
       gameTime -= dt;
       hudTimerValue.innerText = Math.max(0, Math.ceil(gameTime));
@@ -532,10 +569,8 @@ function gameLoop(time) {
       }
     }
 
-    // Spawner
     updateSpawner(dt);
 
-    // Collision Detection
     if (smoothedTrail.length >= 2) {
       let slicedThisFrame = 0;
       for (let i = 0; i < smoothedTrail.length - 1; i++) {
@@ -565,7 +600,6 @@ function gameLoop(time) {
               if (fruit.special) unlockAchievement('golden_fruit');
               unlockAchievement('first_slice');
 
-              // Combo logic
               comboCount++;
               comboTimer = 0.4;
               maxCombo = Math.max(maxCombo, comboCount);
@@ -586,16 +620,13 @@ function gameLoop(time) {
               hudScore.innerText = score;
               showPopup(`+${gainedScore}`, fruit.x, fruit.y, fruit.color);
 
-              // Create sliced halves
               slicedHalves.push(new SlicedHalf(fruit.x, fruit.y, fruit.radius, fruit.color, fruit.juice, fruit.rotation, -1));
               slicedHalves.push(new SlicedHalf(fruit.x, fruit.y, fruit.radius, fruit.color, fruit.juice, fruit.rotation, 1));
 
-              // Splash Particles
               for (let k = 0; k < 12; k++) {
                 particles.push(new Particle(fruit.x, fruit.y, fruit.juice));
               }
 
-              // Level XP Progression
               if (levelXp >= level * 100) {
                 levelXp = 0;
                 level++;
@@ -607,7 +638,6 @@ function gameLoop(time) {
         });
       }
 
-      // Combo Timeout
       if (comboTimer > 0) {
         comboTimer -= dt;
         if (comboTimer <= 0) {
@@ -622,7 +652,7 @@ function gameLoop(time) {
     }
   }
 
-  // Update & Draw Entities
+  // Draw Entities
   fruits.forEach(f => { f.update(dt); f.draw(ctx); });
   fruits = fruits.filter(f => f.active);
 
@@ -632,8 +662,7 @@ function gameLoop(time) {
   particles.forEach(p => { p.update(dt); p.draw(ctx); });
   particles = particles.filter(p => p.active);
 
-  // Popups Update & Render
-  popups.forEach((pop, idx) => {
+  popups.forEach((pop) => {
     pop.y += pop.vy * dt;
     pop.alpha -= dt * 1.2;
     ctx.save();
@@ -661,14 +690,12 @@ function gameLoop(time) {
     ctx.shadowBlur = 15;
     ctx.stroke();
 
-    // Core White Flare
     ctx.lineWidth = 3;
     ctx.strokeStyle = '#ffffff';
     ctx.shadowBlur = 0;
     ctx.stroke();
     ctx.restore();
 
-    // Tip Flare Spark
     const tip = smoothedTrail[smoothedTrail.length - 1];
     ctx.save();
     ctx.beginPath();
@@ -791,7 +818,6 @@ function gameOver() {
   document.getElementById('gameover-accuracy').innerText = `${acc}%`;
   document.getElementById('gameover-combo').innerText = `${maxCombo}x`;
 
-  // Calculate Rank
   let rank = 'C-RANK';
   if (score >= 200 && acc >= 80) rank = 'S-RANK';
   else if (score >= 120) rank = 'A-RANK';
@@ -804,11 +830,16 @@ function gameOver() {
 document.getElementById('btn-start').addEventListener('click', () => startGame(currentMode));
 document.getElementById('btn-mode-select').addEventListener('click', showModeSelect);
 document.getElementById('btn-achievements').addEventListener('click', showAchievements);
+const exitBtn = document.getElementById('btn-exit');
+if (exitBtn) {
+  exitBtn.addEventListener('click', () => showMenu());
+}
+
 document.getElementById('btn-mode-back').addEventListener('click', showMenu);
 document.getElementById('btn-achievements-back').addEventListener('click', showMenu);
 
 document.querySelectorAll('.mode-card').forEach(card => {
-  card.addEventListener('click', (e) => {
+  card.addEventListener('click', () => {
     document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
     card.classList.add('active');
     currentMode = card.getAttribute('data-mode');
