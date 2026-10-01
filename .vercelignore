@@ -1,7 +1,4 @@
-main.py
-config.py
-requirements.txt
-hand_landmarker.task
+*.py
 core/
 vision/
 entities/
@@ -11,3 +8,5 @@ ui/
 scratch/
 tests/
 __pycache__/
+requirements.txt
+hand_landmarker.task
