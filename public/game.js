@@ -1,7 +1,6 @@
 /**
  * FRUIT NINJA - HTML5 Web Application Engine
- * Real-time MediaPipe Hand Tracking, Chaikin Blade Trail, Line-Segment Collision
- * Matched 1:1 with Pygame Local Application UI & Physics
+ * Real-time MediaPipe Hand Tracking with Webcam Mirror Feed & EMA Coordinate Filtering
  */
 
 // Global State
@@ -86,12 +85,14 @@ let maxCombo = 0;
 let totalSlices = 0;
 let successfulSlices = 0;
 
-// Tracking
+// Smooth Tracking (EMA Filter)
 let inputMode = 'HAND'; // HAND or MOUSE
 let rawTrail = [];
 let smoothedTrail = [];
 let mousePos = { x: width / 2, y: height / 2 };
 let isMouseDown = false;
+let filterX = null;
+let filterY = null;
 
 // Entities
 let fruits = [];
@@ -253,7 +254,17 @@ function onHandResults(results) {
     const rawX = (1 - landmarks[8].x) * width; // Mirror X
     const rawY = landmarks[8].y * height;
 
-    addTrailPoint(rawX, rawY);
+    // Apply Exponential Moving Average (EMA) smoothing for perfect stability (alpha = 0.3)
+    if (filterX === null) {
+      filterX = rawX;
+      filterY = rawY;
+    } else {
+      const alpha = 0.3;
+      filterX += alpha * (rawX - filterX);
+      filterY += alpha * (rawY - filterY);
+    }
+
+    addTrailPoint(filterX, filterY);
 
     const indexTip = landmarks[8];
     const pinkyTip = landmarks[20];
@@ -525,11 +536,21 @@ function gameLoop(time) {
 
   ctx.clearRect(0, 0, width, height);
 
+  // Render Real-Time Translucent Webcam Video Feed on Canvas (Matches Pygame OpenCV overlay!)
+  if (videoElement && videoElement.readyState === 4) {
+    ctx.save();
+    ctx.globalAlpha = 0.35; // Translucent video feed overlay
+    ctx.translate(width, 0);
+    ctx.scale(-1, 1); // Mirror video feed horizontally
+    ctx.drawImage(videoElement, 0, 0, width, height);
+    ctx.restore();
+  }
+
   const now = performance.now();
   rawTrail = rawTrail.filter(p => now - p.time < 200);
   smoothedTrail = chaikinSmoothing(rawTrail, 2);
 
-  // Render Background Floating Fruits on Menu Screen (Pygame Match)
+  // Render Background Floating Fruits on Menu Screen
   if (gameState === 'MENU' || gameState === 'MODE_SELECT' || gameState === 'ACHIEVEMENTS') {
     menuBackgroundFruits.forEach(bf => {
       bf.x += bf.vx * dt;
@@ -545,15 +566,15 @@ function gameLoop(time) {
       ctx.beginPath();
       ctx.arc(0, 0, bf.radius, 0, Math.PI * 2);
       ctx.fillStyle = bf.color;
-      ctx.globalAlpha = 0.45;
+      ctx.globalAlpha = 0.55;
       ctx.fill();
       ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
       ctx.stroke();
 
       ctx.beginPath();
       ctx.arc(-bf.radius * 0.3, -bf.radius * 0.3, bf.radius * 0.3, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
       ctx.fill();
       ctx.restore();
     });
