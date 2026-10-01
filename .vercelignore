@@ -1,0 +1,13 @@
+main.py
+config.py
+requirements.txt
+hand_landmarker.task
+core/
+vision/
+entities/
+systems/
+effects/
+ui/
+scratch/
+tests/
+__pycache__/
