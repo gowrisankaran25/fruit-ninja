@@ -360,8 +360,11 @@ class FruitNinjaGame:
             p.update(time_scale)
 
         # ── Collision detection ──
-        if self.motion_analyzer.is_slicing:
+        if self.motion_analyzer.is_slicing or (self.use_mouse and pygame.mouse.get_pressed()[0]):
             segments = self.motion_analyzer.get_blade_segments()
+            if not segments and self.use_mouse and pygame.mouse.get_pressed()[0]:
+                mpos = pygame.mouse.get_pos()
+                segments = [(mpos, mpos)]
             self._check_collisions(segments)
 
         # ── Missed fruits ──
@@ -512,13 +515,21 @@ class FruitNinjaGame:
                 continue
             if blade_hits_entity(segments, bomb.x, bomb.y, bomb.radius):
                 bomb.trigger()
-                self.lives.lose(bomb.lives_cost)
                 self.scoring.bomb_hit()
                 self.combo.count = 0
                 # Effects
                 self.particles.emit_explosion(int(bomb.x), int(bomb.y))
                 self.screen_fx.trigger_shake(15 if bomb.type == "mega" else 10)
                 self.screen_fx.trigger_flash((255, 0, 0), 80)
+                if self.game_mode in ["classic", "survival"]:
+                    self.lives.lose(self.lives.lives)
+                    self._game_over()
+                    break
+                else:
+                    self.lives.lose(bomb.lives_cost)
+                    if not self.lives.is_alive:
+                        self._game_over()
+                        break
 
         # Powerups
         for pu in self.powerups_entities:

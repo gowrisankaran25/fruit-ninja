@@ -592,11 +592,20 @@ function gameLoop(time) {
 
     updateSpawner(dt);
 
+    const segmentsToCheck = [];
     if (smoothedTrail.length >= 2) {
-      let slicedThisFrame = 0;
       for (let i = 0; i < smoothedTrail.length - 1; i++) {
-        const p1 = smoothedTrail[i];
-        const p2 = smoothedTrail[i + 1];
+        segmentsToCheck.push({ p1: smoothedTrail[i], p2: smoothedTrail[i + 1] });
+      }
+    } else if (smoothedTrail.length === 1 && (isMouseDown || inputMode === 'HAND')) {
+      segmentsToCheck.push({ p1: smoothedTrail[0], p2: smoothedTrail[0] });
+    }
+
+    if (segmentsToCheck.length > 0) {
+      let slicedThisFrame = 0;
+      for (const seg of segmentsToCheck) {
+        const p1 = seg.p1;
+        const p2 = seg.p2;
 
         fruits.forEach(fruit => {
           if (fruit.active && segmentHitsCircle(p1, p2, fruit)) {
