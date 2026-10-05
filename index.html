@@ -96,21 +96,27 @@
 
     /* Pygame-Matched Main Title Box */
     .pygame-title-box {
-      background: rgba(25, 20, 48, 0.75);
-      border: 2px solid rgba(100, 130, 255, 0.4);
-      box-shadow: 0 0 30px rgba(0, 240, 255, 0.2), inset 0 0 15px rgba(255, 255, 255, 0.05);
-      border-radius: 24px;
+      background: rgba(15, 18, 45, 0.85);
+      border: 2px solid rgba(120, 100, 255, 0.5);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
       padding: 0.8rem 3.5rem;
-      margin-bottom: 2.5rem;
-      backdrop-filter: blur(12px);
+      margin-bottom: 2.2rem;
+      backdrop-filter: blur(16px);
+      animation: floatPlate 3.5s ease-in-out infinite;
+    }
+
+    @keyframes floatPlate {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-7px); }
     }
 
     .pygame-title-box h1 {
-      font-size: 3.8rem;
+      font-size: 3.6rem;
       font-weight: 900;
-      letter-spacing: 3px;
+      letter-spacing: 4px;
       color: #ffffff;
-      text-shadow: 0 0 25px rgba(0, 240, 255, 0.7);
+      text-shadow: 3px 3px 0 #501e96, 0 0 20px rgba(120, 100, 255, 0.5);
     }
 
     /* Pygame Button Layout */
@@ -118,65 +124,80 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 1.2rem;
+      gap: 1.1rem;
       width: 100%;
     }
 
     .btn-pygame {
-      width: 380px;
+      width: 350px;
       max-width: 85vw;
-      height: 60px;
+      height: 54px;
       font-family: var(--font-family);
-      font-size: 1.35rem;
-      font-weight: 900;
+      font-size: 1.25rem;
+      font-weight: 800;
       letter-spacing: 2px;
-      border-radius: 20px;
-      background: rgba(18, 14, 32, 0.7);
+      border-radius: 16px;
+      background: rgba(20, 25, 55, 0.65);
       color: #ffffff;
       cursor: pointer;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       text-transform: uppercase;
       backdrop-filter: blur(10px);
+      position: relative;
+    }
+
+    .btn-pygame::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 12px;
+      right: 12px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.2);
     }
 
     /* Colors matched 1:1 with Pygame local window */
     .btn-play {
-      border: 2px solid var(--accent-green);
-      box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+      border: 2px solid #32c850;
+      box-shadow: 0 0 14px rgba(50, 200, 80, 0.25);
     }
     .btn-play:hover {
-      background: rgba(0, 255, 136, 0.18);
-      box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+      background: rgba(50, 200, 80, 0.2);
+      border-color: #50ff78;
+      box-shadow: 0 0 24px rgba(50, 200, 80, 0.5);
       transform: translateY(-2px) scale(1.02);
     }
 
     .btn-modes {
-      border: 2px solid #2288ff;
-      box-shadow: 0 0 15px rgba(0, 136, 255, 0.2);
+      border: 2px solid #3278dc;
+      box-shadow: 0 0 14px rgba(50, 120, 220, 0.25);
     }
     .btn-modes:hover {
-      background: rgba(0, 136, 255, 0.18);
-      box-shadow: 0 0 30px rgba(0, 136, 255, 0.5);
+      background: rgba(50, 120, 220, 0.2);
+      border-color: #5aa0ff;
+      box-shadow: 0 0 24px rgba(50, 120, 220, 0.5);
       transform: translateY(-2px) scale(1.02);
     }
 
     .btn-achieve {
-      border: 2px solid var(--accent-gold);
-      box-shadow: 0 0 15px rgba(255, 183, 0, 0.2);
+      border: 2px solid #ffc832;
+      box-shadow: 0 0 14px rgba(255, 200, 50, 0.25);
     }
     .btn-achieve:hover {
-      background: rgba(255, 183, 0, 0.18);
-      box-shadow: 0 0 30px rgba(255, 183, 0, 0.5);
+      background: rgba(255, 200, 50, 0.2);
+      border-color: #ffe064;
+      box-shadow: 0 0 24px rgba(255, 200, 50, 0.5);
       transform: translateY(-2px) scale(1.02);
     }
 
     .btn-exit {
-      border: 2px solid var(--danger-red);
-      box-shadow: 0 0 15px rgba(255, 51, 102, 0.2);
+      border: 2px solid #dc3232;
+      box-shadow: 0 0 14px rgba(220, 50, 50, 0.25);
     }
     .btn-exit:hover {
-      background: rgba(255, 51, 102, 0.18);
-      box-shadow: 0 0 30px rgba(255, 51, 102, 0.5);
+      background: rgba(220, 50, 50, 0.2);
+      border-color: #ff5050;
+      box-shadow: 0 0 24px rgba(220, 50, 50, 0.5);
       transform: translateY(-2px) scale(1.02);
     }
 
@@ -542,7 +563,7 @@
       <div class="pygame-bottom-bar">
         <div class="status-left">
           <span style="display: inline-block; width: 10px; height: 10px; background: #00ff88; border-radius: 50%; box-shadow: 0 0 8px #00ff88;"></span>
-          <span id="status-camera">CAMERA: READY</span>
+          <span id="status-camera">CAMERA: READY (CLICK PLAY)</span>
         </div>
         <div class="status-center">
           Press TAB to toggle mouse control

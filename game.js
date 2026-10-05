@@ -102,16 +102,18 @@ let particles = [];
 let popups = [];
 
 // Initialize Menu Background Floating Fruits
-for (let i = 0; i < 8; i++) {
+for (let i = 0; i < 10; i++) {
+  const t = FRUIT_TYPES[Math.floor(Math.random() * FRUIT_TYPES.length)];
   menuBackgroundFruits.push({
     x: Math.random() * width,
     y: Math.random() * height,
     radius: 35 + Math.random() * 25,
-    color: FRUIT_TYPES[Math.floor(Math.random() * FRUIT_TYPES.length)].color,
-    vx: (Math.random() - 0.5) * 60,
-    vy: (Math.random() - 0.5) * 60,
+    color: t.color,
+    type: t.name,
+    vx: (Math.random() - 0.5) * 50,
+    vy: (Math.random() - 0.5) * 50,
     rot: Math.random() * Math.PI * 2,
-    vRot: (Math.random() - 0.5) * 2
+    vRot: (Math.random() - 0.5) * 1.5
   });
 }
 
@@ -205,74 +207,131 @@ function segmentHitsCircle(p1, p2, circle) {
   return distSq <= circle.radius ** 2;
 }
 
-// MediaPipe Camera & Hand Landmark Initialization
+// Preload Fruit Textures from data/
+const fruitImages = {
+  apple: new Image(),
+  banana: new Image(),
+  orange: new Image(),
+  watermelon: new Image(),
+  pineapple: new Image(),
+  golden: new Image(),
+};
+fruitImages.apple.src = 'data/apple.png';
+fruitImages.banana.src = 'data/banana.png';
+fruitImages.orange.src = 'data/orange.png';
+fruitImages.watermelon.src = 'data/watermelon.png';
+fruitImages.pineapple.src = 'data/pineapple.png';
+fruitImages.golden.src = 'data/golden.png';
+
+// MediaPipe Camera & Hand Landmark Initialization (Lazy on Play)
 const videoElement = document.getElementById('webcam');
+let cameraInstance = null;
+let cameraReady = false;
+let cameraStarting = false;
+let openPalmFrames = 0;
 
-if (typeof Hands !== 'undefined') {
-  const hands = new Hands({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-  });
+function initCamera(onReadyCallback) {
+  if (cameraReady) {
+    if (onReadyCallback) onReadyCallback();
+    return;
+  }
+  if (cameraStarting) return;
+  cameraStarting = true;
 
-  hands.setOptions({
-    maxNumHands: 1,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.75,
-    minTrackingConfidence: 0.75
-  });
+  if (statusCamera) statusCamera.innerText = 'CAMERA: CONNECTING...';
+  if (hudStatusCamera) hudStatusCamera.innerText = 'CAMERA: CONNECTING...';
 
-  hands.onResults(onHandResults);
+  if (typeof Hands !== 'undefined' && videoElement) {
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
 
-  const camera = new Camera(videoElement, {
-    onFrame: async () => {
-      await hands.send({ image: videoElement });
-    },
-    width: 640,
-    height: 480
-  });
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.65,
+      minTrackingConfidence: 0.65
+    });
 
-  camera.start().then(() => {
-    if (statusCamera) statusCamera.innerText = 'CAMERA: READY';
-    if (hudStatusCamera) hudStatusCamera.innerText = 'CAMERA: READY';
-  }).catch(err => {
-    console.warn("Webcam permission denied or camera missing. Defaulting to Mouse mode.", err);
-    if (statusCamera) statusCamera.innerText = 'CAMERA: MOUSE MODE';
-    if (hudStatusCamera) hudStatusCamera.innerText = 'CAMERA: MOUSE MODE';
+    hands.onResults(onHandResults);
+
+    cameraInstance = new Camera(videoElement, {
+      onFrame: async () => {
+        if (videoElement.readyState >= 2) {
+          await hands.send({ image: videoElement });
+        }
+      },
+      width: 1280,
+      height: 720
+    });
+
+    cameraInstance.start().then(() => {
+      cameraReady = true;
+      cameraStarting = false;
+      inputMode = 'HAND';
+      updateInputBadge();
+      if (statusCamera) statusCamera.innerText = 'CAMERA: READY';
+      if (hudStatusCamera) hudStatusCamera.innerText = 'CAMERA: READY';
+      if (onReadyCallback) onReadyCallback();
+    }).catch(err => {
+      console.warn("Webcam permission denied or camera missing. Defaulting to Mouse mode.", err);
+      cameraStarting = false;
+      inputMode = 'MOUSE';
+      updateInputBadge();
+      if (statusCamera) statusCamera.innerText = 'CAMERA: MOUSE MODE';
+      if (hudStatusCamera) hudStatusCamera.innerText = 'CAMERA: MOUSE MODE';
+      if (onReadyCallback) onReadyCallback();
+    });
+  } else {
+    cameraStarting = false;
     inputMode = 'MOUSE';
     updateInputBadge();
-  });
-} else {
-  inputMode = 'MOUSE';
-  updateInputBadge();
+    if (onReadyCallback) onReadyCallback();
+  }
 }
+
+// Initial status indicator without triggering camera permission prompt
+if (statusCamera) statusCamera.innerText = 'CAMERA: CLICK PLAY TO START';
+if (hudStatusCamera) hudStatusCamera.innerText = 'CAMERA: READY';
 
 function onHandResults(results) {
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     inputMode = 'HAND';
     updateInputBadge();
+    const landmarks = results.multiHandLandmarks[0];
+
     const margin = 0.05;
     let normX = (1 - landmarks[8].x - margin) / (1 - 2 * margin);
     let normY = (landmarks[8].y - margin) / (1 - 2 * margin);
     const rawX = Math.max(0, Math.min(width, normX * width));
     const rawY = Math.max(0, Math.min(height, normY * height));
 
-    // Apply Exponential Moving Average (EMA) smoothing for perfect stability (alpha = 0.3)
+    // Responsive velocity-adaptive smoothing
     if (filterX === null) {
       filterX = rawX;
       filterY = rawY;
     } else {
-      const alpha = 0.3;
+      const dist = Math.hypot(rawX - filterX, rawY - filterY);
+      const alpha = dist > 25 ? 0.8 : 0.35;
       filterX += alpha * (rawX - filterX);
       filterY += alpha * (rawY - filterY);
     }
 
     addTrailPoint(filterX, filterY);
 
+    // Debounced pause on open palm (requires steady open hand hold)
     const indexTip = landmarks[8];
     const pinkyTip = landmarks[20];
     const handSpan = Math.hypot(pinkyTip.x - indexTip.x, pinkyTip.y - indexTip.y);
 
-    if (handSpan > 0.4 && gameState === 'PLAYING') {
-      pauseGame();
+    if (handSpan > 0.45 && gameState === 'PLAYING') {
+      openPalmFrames++;
+      if (openPalmFrames > 25) {
+        pauseGame();
+        openPalmFrames = 0;
+      }
+    } else {
+      openPalmFrames = 0;
     }
   }
 }
@@ -377,7 +436,7 @@ class Fruit {
     if (this.isBomb) {
       ctx.beginPath();
       ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-      ctx.fillStyle = '#111122';
+      ctx.fillStyle = '#151522';
       ctx.fill();
       ctx.lineWidth = 3;
       ctx.strokeStyle = '#ff3366';
@@ -393,24 +452,35 @@ class Fruit {
       ctx.beginPath();
       ctx.arc(15, -this.radius - 18, 4, 0, Math.PI * 2);
       ctx.fillStyle = '#ffff00';
+      ctx.shadowColor = '#ff6600';
+      ctx.shadowBlur = 12;
       ctx.fill();
     } else {
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-      ctx.fillStyle = this.color;
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.stroke();
+      const img = fruitImages[this.type];
+      if (img && img.complete && img.naturalWidth > 0) {
+        if (this.special) {
+          ctx.shadowColor = '#ffd700';
+          ctx.shadowBlur = 25;
+        }
+        ctx.drawImage(img, -this.radius, -this.radius, this.radius * 2, this.radius * 2);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.stroke();
 
-      ctx.beginPath();
-      ctx.arc(-this.radius * 0.3, -this.radius * 0.3, this.radius * 0.35, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.fill();
+        ctx.beginPath();
+        ctx.arc(-this.radius * 0.3, -this.radius * 0.3, this.radius * 0.35, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fill();
 
-      if (this.special) {
-        ctx.shadowColor = '#ffd700';
-        ctx.shadowBlur = 20;
+        if (this.special) {
+          ctx.shadowColor = '#ffd700';
+          ctx.shadowBlur = 20;
+        }
       }
     }
 
@@ -420,7 +490,7 @@ class Fruit {
 
 // Sliced Half Fruit Entity
 class SlicedHalf {
-  constructor(x, y, radius, color, juice, angle, side) {
+  constructor(x, y, radius, color, juice, angle, side, type) {
     this.x = x;
     this.y = y;
     this.radius = radius;
@@ -428,6 +498,7 @@ class SlicedHalf {
     this.juice = juice;
     this.rotation = angle;
     this.side = side;
+    this.type = type;
 
     this.vx = side * (100 + Math.random() * 150);
     this.vy = -(150 + Math.random() * 100);
@@ -461,8 +532,18 @@ class SlicedHalf {
       ctx.arc(0, 0, this.radius, Math.PI * 1.5, Math.PI * 0.5);
     }
     ctx.closePath();
-    ctx.fillStyle = this.color;
-    ctx.fill();
+
+    const img = this.type ? fruitImages[this.type] : null;
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.save();
+      ctx.clip();
+      ctx.drawImage(img, -this.radius, -this.radius, this.radius * 2, this.radius * 2);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = this.color;
+      ctx.fill();
+    }
+
     ctx.lineWidth = 2;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     ctx.stroke();
@@ -530,6 +611,55 @@ function updateSpawner(dt) {
   }
 }
 
+// Background Helpers
+function drawMenuBackground() {
+  const grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, '#080819');
+  grad.addColorStop(1, '#1c0c37');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = 'rgba(45, 40, 85, 0.3)';
+  ctx.lineWidth = 1;
+  const step = 60;
+  for (let x = 0; x < width; x += step) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+  for (let y = 0; y < height; y += step) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+}
+
+function drawGameBackground() {
+  const grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, '#0a0a23');
+  grad.addColorStop(1, '#050514');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = 'rgba(25, 25, 55, 0.4)';
+  ctx.lineWidth = 1;
+  const step = 60;
+  for (let x = 0; x < width; x += step) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+  for (let y = 0; y < height; y += step) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+}
+
 // Main Game Engine Loop
 function gameLoop(time) {
   const dt = Math.min((time - lastTime) / 1000, 0.1);
@@ -537,46 +667,79 @@ function gameLoop(time) {
 
   ctx.clearRect(0, 0, width, height);
 
-  // Render Real-Time Translucent Webcam Video Feed on Canvas (Matches Pygame OpenCV overlay!)
-  if (videoElement && videoElement.readyState === 4) {
-    ctx.save();
-    ctx.globalAlpha = 0.35; // Translucent video feed overlay
-    ctx.translate(width, 0);
-    ctx.scale(-1, 1); // Mirror video feed horizontally
-    ctx.drawImage(videoElement, 0, 0, width, height);
-    ctx.restore();
+  // Render Background: In gameplay, show mirrored AR video background with edge vignette!
+  // In Menu, show clean deep space indigo gradient with glowing floating fruits!
+  if (gameState === 'PLAYING') {
+    if (videoElement && videoElement.readyState >= 2 && inputMode === 'HAND') {
+      ctx.save();
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(videoElement, 0, 0, width, height);
+      ctx.restore();
+
+      // Top and bottom HUD vignettes for optimal contrast
+      const topGrad = ctx.createLinearGradient(0, 0, 0, 95);
+      topGrad.addColorStop(0, 'rgba(8, 12, 28, 0.85)');
+      topGrad.addColorStop(1, 'rgba(8, 12, 28, 0)');
+      ctx.fillStyle = topGrad;
+      ctx.fillRect(0, 0, width, 95);
+
+      const botGrad = ctx.createLinearGradient(0, height - 60, 0, height);
+      botGrad.addColorStop(0, 'rgba(8, 12, 28, 0)');
+      botGrad.addColorStop(1, 'rgba(8, 12, 28, 0.85)');
+      ctx.fillStyle = botGrad;
+      ctx.fillRect(0, height - 60, width, 60);
+    } else {
+      drawGameBackground();
+    }
+  } else {
+    drawMenuBackground();
   }
 
   const now = performance.now();
   rawTrail = rawTrail.filter(p => now - p.time < 200);
   smoothedTrail = chaikinSmoothing(rawTrail, 2);
 
-  // Render Background Floating Fruits on Menu Screen
+  // Render Background Floating Fruits on Menu Screen (with halo glow & real textures!)
   if (gameState === 'MENU' || gameState === 'MODE_SELECT' || gameState === 'ACHIEVEMENTS') {
     menuBackgroundFruits.forEach(bf => {
       bf.x += bf.vx * dt;
       bf.y += bf.vy * dt;
       bf.rot += bf.vRot * dt;
 
-      if (bf.x < 0 || bf.x > width) bf.vx *= -1;
-      if (bf.y < 0 || bf.y > height) bf.vy *= -1;
+      if (bf.x < -bf.radius) bf.x = width + bf.radius;
+      if (bf.x > width + bf.radius) bf.x = -bf.radius;
+      if (bf.y < -bf.radius) bf.y = height + bf.radius;
+      if (bf.y > height + bf.radius) bf.y = -bf.radius;
 
       ctx.save();
       ctx.translate(bf.x, bf.y);
       ctx.rotate(bf.rot);
-      ctx.beginPath();
-      ctx.arc(0, 0, bf.radius, 0, Math.PI * 2);
-      ctx.fillStyle = bf.color;
-      ctx.globalAlpha = 0.55;
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-      ctx.stroke();
 
-      ctx.beginPath();
-      ctx.arc(-bf.radius * 0.3, -bf.radius * 0.3, bf.radius * 0.3, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-      ctx.fill();
+      // Outer halo glow
+      ctx.shadowColor = bf.color;
+      ctx.shadowBlur = 25;
+
+      const img = fruitImages[bf.type];
+      if (img && img.complete && img.naturalWidth > 0) {
+        ctx.globalAlpha = 0.85;
+        ctx.drawImage(img, -bf.radius, -bf.radius, bf.radius * 2, bf.radius * 2);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, bf.radius, 0, Math.PI * 2);
+        ctx.fillStyle = bf.color;
+        ctx.globalAlpha = 0.65;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(-bf.radius * 0.3, -bf.radius * 0.3, bf.radius * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fill();
+      }
+
       ctx.restore();
     });
   }
@@ -651,8 +814,8 @@ function gameLoop(time) {
               hudScore.innerText = score;
               showPopup(`+${gainedScore}`, fruit.x, fruit.y, fruit.color);
 
-              slicedHalves.push(new SlicedHalf(fruit.x, fruit.y, fruit.radius, fruit.color, fruit.juice, fruit.rotation, -1));
-              slicedHalves.push(new SlicedHalf(fruit.x, fruit.y, fruit.radius, fruit.color, fruit.juice, fruit.rotation, 1));
+              slicedHalves.push(new SlicedHalf(fruit.x, fruit.y, fruit.radius, fruit.color, fruit.juice, fruit.rotation, -1, fruit.type));
+              slicedHalves.push(new SlicedHalf(fruit.x, fruit.y, fruit.radius, fruit.color, fruit.juice, fruit.rotation, 1, fruit.type));
 
               for (let k = 0; k < 12; k++) {
                 particles.push(new Particle(fruit.x, fruit.y, fruit.juice));
@@ -857,8 +1020,18 @@ function gameOver() {
   document.getElementById('gameover-rank').innerText = rank;
 }
 
+function startWithCamera(mode = 'classic') {
+  if (!cameraReady && !cameraStarting && inputMode === 'HAND') {
+    initCamera(() => {
+      startGame(mode);
+    });
+  } else {
+    startGame(mode);
+  }
+}
+
 // Event Listeners for UI Buttons
-document.getElementById('btn-start').addEventListener('click', () => startGame(currentMode));
+document.getElementById('btn-start').addEventListener('click', () => startWithCamera(currentMode));
 document.getElementById('btn-mode-select').addEventListener('click', showModeSelect);
 document.getElementById('btn-achievements').addEventListener('click', showAchievements);
 const exitBtn = document.getElementById('btn-exit');
@@ -874,11 +1047,11 @@ document.querySelectorAll('.mode-card').forEach(card => {
     document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
     card.classList.add('active');
     currentMode = card.getAttribute('data-mode');
-    startGame(currentMode);
+    startWithCamera(currentMode);
   });
 });
 
-document.getElementById('btn-restart').addEventListener('click', () => startGame(currentMode));
+document.getElementById('btn-restart').addEventListener('click', () => startWithCamera(currentMode));
 document.getElementById('btn-main-menu').addEventListener('click', showMenu);
 document.getElementById('btn-resume').addEventListener('click', resumeGame);
 document.getElementById('btn-pause-menu').addEventListener('click', showMenu);
