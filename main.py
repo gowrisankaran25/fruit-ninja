@@ -211,6 +211,11 @@ class FruitNinjaGame:
         self._calibration_start = 0
         self._hand_detected_frames = 0
 
+        # Camera AR & Video state
+        self.current_frame = None
+        self.camera_mode = "ar_clear"  # "ar_clear", "ar_tint", "classic"
+        self._open_palm_hold_frames = 0
+
     # ═══════════════════════════════════════════════════
     #   MAIN LOOP
     # ═══════════════════════════════════════════════════
@@ -257,6 +262,10 @@ class FruitNinjaGame:
         elif key == pygame.K_r:
             if self.state == GameState.GAME_OVER:
                 self._start_game(self.game_mode)
+        elif key == pygame.K_c:
+            modes = ["ar_clear", "ar_tint", "classic"]
+            cur = modes.index(self.camera_mode) if self.camera_mode in modes else 0
+            self.camera_mode = modes[(cur + 1) % len(modes)]
 
     def _on_click(self, pos):
         if self.state == GameState.MENU:
@@ -273,6 +282,12 @@ class FruitNinjaGame:
 
     # ───────────── Update ─────────────
     def _update(self, dt):
+        # Capture camera frame once per game tick to maximize performance and frame sync
+        if not self.use_mouse and self.camera.is_ready:
+            self.current_frame = self.camera.read()
+        else:
+            self.current_frame = None
+
         # Achievement popups
         self._update_achievement_popup()
 
@@ -302,7 +317,7 @@ class FruitNinjaGame:
                 f["y"] = -50
 
     def _update_calibration(self):
-        frame = self.camera.read()
+        frame = self.current_frame
         if frame is not None:
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             hands = self.hand_detector.detect(rgb)
@@ -461,24 +476,36 @@ class FruitNinjaGame:
                 return self.hand_detector.smooth_position((mx, my))
             return self.hand_detector.smooth_position(None)
 
-        frame = self.camera.read()
+        frame = self.current_frame
         if frame is None:
             return self.hand_detector.smooth_position(None)
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         hands = self.hand_detector.detect(rgb)
         if not hands:
+            self._open_palm_hold_frames = 0
             return self.hand_detector.smooth_position(None)
 
         hand = hands[0]
         lm = hand["landmarks"]
-        screen_pts = self.hand_detector.to_screen(lm, SCREEN_WIDTH, SCREEN_HEIGHT)
+        screen_pts = self.hand_detector.to_screen(
+            lm, SCREEN_WIDTH, SCREEN_HEIGHT,
+            cam_w=self.camera.width, cam_h=self.camera.height
+        )
         index_tip = screen_pts[HandDetector.INDEX_TIP]
 
-        # Gesture detection
+        # Gesture detection: require deliberate steady open palm to pause (no accidental pause during fast slices)
         gesture, meta = self.gesture_recognizer.recognize(lm)
         if gesture == Gesture.OPEN_PALM and self.state == GameState.PLAYING:
-            self.state = GameState.PAUSED
+            if not self.motion_analyzer.is_slicing and self.motion_analyzer.speed < 200:
+                self._open_palm_hold_frames += 1
+                if self._open_palm_hold_frames > 15:
+                    self.state = GameState.PAUSED
+                    self._open_palm_hold_frames = 0
+            else:
+                self._open_palm_hold_frames = 0
+        else:
+            self._open_palm_hold_frames = 0
 
         raw_pos = (int(index_tip[0]), int(index_tip[1]))
         return self.hand_detector.smooth_position(raw_pos)
@@ -710,7 +737,7 @@ class FruitNinjaGame:
         cam_txt = self.font_small.render(cam_status, True, cam_col)
         self.screen.blit(cam_txt, (35, SCREEN_HEIGHT - 42))
 
-        hint = self.font_small.render("Press TAB to toggle mouse control", True, (160, 170, 210))
+        hint = self.font_small.render(f"TAB: Mouse  •  C: Cam Mode ({self.camera_mode.upper()})", True, (160, 170, 210))
         self.screen.blit(hint, (260, SCREEN_HEIGHT - 42))
 
         mode_txt = self.font_small.render(
@@ -838,12 +865,12 @@ class FruitNinjaGame:
         title = self.font_large.render("CAMERA CALIBRATION", True, Colors.WHITE)
         self.screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, 45)))
 
-        frame = self.camera.read()
+        frame = self.current_frame
         if frame is not None:
             preview_w, preview_h = 480, 360
             frame_resized = cv2.resize(frame, (preview_w, preview_h))
             frame_rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
-            surf = pygame.surfarray.make_surface(frame_rgb.swapaxes(0, 1))
+            surf = pygame.image.frombuffer(frame_rgb.tobytes(), (preview_w, preview_h), 'RGB')
             px = SCREEN_WIDTH // 2 - preview_w // 2
             py = 90
             self.screen.blit(surf, (px, py))
@@ -880,12 +907,16 @@ class FruitNinjaGame:
 
     # ─── Game ───
     def _render_game(self):
-        self._draw_game_bg()
+        if not self.use_mouse and self.camera.is_ready and self.current_frame is not None:
+            if self.camera_mode == "classic":
+                self._draw_game_bg()
+                self._draw_camera_feed()
+            else:
+                self._draw_camera_background()
+        else:
+            self._draw_game_bg()
 
         offset = self.screen_fx.get_offset()
-
-        if not self.use_mouse:
-            self._draw_camera_feed()
 
         for fruit in self.fruits:
             fruit.draw(self.screen)
@@ -913,15 +944,63 @@ class FruitNinjaGame:
             self.level_sys, self.powerup_sys, timer_remaining
         )
 
+    def _draw_camera_background(self):
+        """
+        Renders the live webcam feed across the entire game screen.
+        Applies a center-crop to 16:9 so the image is never distorted,
+        followed by a stylish AR gaming vignette / cyber tint.
+        """
+        frame = self.current_frame
+        if frame is None:
+            self._draw_game_bg()
+            return
+
+        h, w = frame.shape[:2]
+        target_aspect = SCREEN_WIDTH / SCREEN_HEIGHT
+        aspect = w / h
+
+        if aspect < target_aspect:
+            crop_h = int(w / target_aspect)
+            y0 = (h - crop_h) // 2
+            cropped = frame[y0:y0 + crop_h, :]
+        else:
+            crop_w = int(h * target_aspect)
+            x0 = (w - crop_w) // 2
+            cropped = frame[:, x0:x0 + crop_w]
+
+        resized = cv2.resize(cropped, (SCREEN_WIDTH, SCREEN_HEIGHT), interpolation=cv2.INTER_LINEAR)
+        frame_rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+        cam_surf = pygame.image.frombuffer(frame_rgb.tobytes(), (SCREEN_WIDTH, SCREEN_HEIGHT), 'RGB')
+        self.screen.blit(cam_surf, (0, 0))
+
+        if self.camera_mode == "ar_tint":
+            tint_overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            tint_overlay.fill((10, 15, 40, 95))
+            self.screen.blit(tint_overlay, (0, 0))
+            # Subtle futuristic cyber grid
+            grid_col = (100, 150, 255, 25)
+            grid_surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            for x in range(0, SCREEN_WIDTH, 80):
+                pygame.draw.line(grid_surf, grid_col, (x, 0), (x, SCREEN_HEIGHT))
+            for y in range(0, SCREEN_HEIGHT, 80):
+                pygame.draw.line(grid_surf, grid_col, (0, y), (SCREEN_WIDTH, y))
+            self.screen.blit(grid_surf, (0, 0))
+        else:
+            # "ar_clear": Sleek glassmorphic gradient top/bottom vignette to enhance HUD contrast
+            vignette = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            pygame.draw.rect(vignette, (8, 12, 28, 85), (0, 0, SCREEN_WIDTH, 82))
+            pygame.draw.rect(vignette, (8, 12, 28, 85), (0, SCREEN_HEIGHT - 55, SCREEN_WIDTH, 55))
+            self.screen.blit(vignette, (0, 0))
+
     def _draw_camera_feed(self):
-        """Small camera preview in bottom-right corner."""
-        frame = self.camera.read()
+        """Small camera preview in bottom-right corner (for classic mode)."""
+        frame = self.current_frame
         if frame is None:
             return
         preview_w, preview_h = 160, 120
         frame_resized = cv2.resize(frame, (preview_w, preview_h))
         frame_rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
-        surf = pygame.surfarray.make_surface(frame_rgb.swapaxes(0, 1))
+        surf = pygame.image.frombuffer(frame_rgb.tobytes(), (preview_w, preview_h), 'RGB')
         x = SCREEN_WIDTH - preview_w - 15
         y = SCREEN_HEIGHT - preview_h - 15
 
@@ -933,7 +1012,14 @@ class FruitNinjaGame:
 
     # ─── Boss ───
     def _render_boss(self):
-        self._draw_game_bg()
+        if not self.use_mouse and self.camera.is_ready and self.current_frame is not None:
+            if self.camera_mode == "classic":
+                self._draw_game_bg()
+                self._draw_camera_feed()
+            else:
+                self._draw_camera_background()
+        else:
+            self._draw_game_bg()
 
         t = pygame.time.get_ticks() / 500
         if int(t) % 2 == 0:
@@ -976,6 +1062,7 @@ class FruitNinjaGame:
             "SPACE / ESC   —   Resume Game",
             "M   —   Return to Main Menu",
             "TAB   —   Toggle Mouse Control",
+            f"C   —   Camera Mode: {self.camera_mode.upper()}",
         ]
         for i, h in enumerate(hints):
             txt = self.font_small.render(h, True, (190, 200, 230))

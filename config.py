@@ -71,7 +71,7 @@ COMBO_MULTIPLIERS = {
     5: 2.0, 10: 3.0, 20: 5.0,
 }
 BLADE_TRAIL_LENGTH = 20
-BLADE_MIN_SPEED = 8          # pixels/frame to count as slice
+BLADE_MIN_SPEED = 5          # pixels/frame to count as slice
 
 # ──────────────────── Difficulty ────────────────────
 DIFFICULTY_LEVELS = {
@@ -120,10 +120,11 @@ GAME_MODES = {
 }
 
 # ──────────────────── Camera ────────────────────
-CAMERA_WIDTH = 640
-CAMERA_HEIGHT = 480
+CAMERA_WIDTH = 1280
+CAMERA_HEIGHT = 720
 CAMERA_INDEX = 0
-HAND_CONFIDENCE = 0.75
-HAND_TRACKING_CONFIDENCE = 0.75
+HAND_CONFIDENCE = 0.65
+HAND_TRACKING_CONFIDENCE = 0.65
 SMOOTHING_WINDOW = 5
+ACTIVE_MARGIN = 0.05         # 5% margin for effortless full-screen reach
 

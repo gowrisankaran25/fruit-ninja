@@ -7,9 +7,10 @@ import os
 import urllib.request
 import cv2
 import mediapipe as mp
+import math
 import numpy as np
 from collections import deque
-from config import HAND_CONFIDENCE, HAND_TRACKING_CONFIDENCE, SMOOTHING_WINDOW
+from config import HAND_CONFIDENCE, HAND_TRACKING_CONFIDENCE, SMOOTHING_WINDOW, ACTIVE_MARGIN
 
 
 class HandDetector:
@@ -103,24 +104,72 @@ class HandDetector:
             return hands
         return []
 
-    def to_screen(self, landmarks, screen_w, screen_h):
-        """Convert normalised landmarks → pixel coordinates (Nx2)."""
+    def to_screen(self, landmarks, screen_w, screen_h, cam_w=None, cam_h=None, margin=ACTIVE_MARGIN):
+        """
+        Convert normalised landmarks (0..1) to screen-space pixel coordinates (Nx2).
+        Applies aspect-ratio center-crop matching the 16:9 full-screen camera background,
+        and an active reach margin so the player can reach all screen edges comfortably
+        without hand slipping outside camera field of view.
+        """
         pts = landmarks[:, :2].copy()
-        pts[:, 0] *= screen_w
-        pts[:, 1] *= screen_h
-        return pts.astype(int)
+        raw_x = pts[:, 0]
+        raw_y = pts[:, 1]
+
+        if cam_w and cam_h and cam_w > 0 and cam_h > 0:
+            target_aspect = screen_w / screen_h
+            cam_aspect = cam_w / cam_h
+            if cam_aspect < target_aspect:
+                # 4:3 camera -> 16:9 crop (crop vertical)
+                crop_h = cam_w / target_aspect
+                y_offset = (cam_h - crop_h) / 2.0
+                norm_x = raw_x
+                norm_y = (raw_y * cam_h - y_offset) / crop_h
+            else:
+                # Wide camera -> crop horizontal
+                crop_w = cam_h * target_aspect
+                x_offset = (cam_w - crop_w) / 2.0
+                norm_x = (raw_x * cam_w - x_offset) / crop_w
+                norm_y = raw_y
+        else:
+            norm_x = raw_x
+            norm_y = raw_y
+
+        if margin > 0:
+            norm_x = (norm_x - margin) / (1.0 - 2.0 * margin)
+            norm_y = (norm_y - margin) / (1.0 - 2.0 * margin)
+
+        sx = np.clip(norm_x * screen_w, 0, screen_w)
+        sy = np.clip(norm_y * screen_h, 0, screen_h)
+        return np.column_stack((sx, sy)).astype(int)
 
     def smooth_position(self, pos):
         """
-        Apply a simple moving average smoothing over recent (x, y) coordinates
-        to reduce cursor jitter during gameplay.
+        Apply velocity-adaptive smoothing over recent (x, y) coordinates.
+        High speed (slicing) uses responsive recency weighting to eliminate lag.
+        Low speed uses wider averaging to eliminate camera jitter.
         """
         if pos is None:
             self.pos_history.clear()
             return None
         self.pos_history.append(pos)
-        avg_x = sum(p[0] for p in self.pos_history) / len(self.pos_history)
-        avg_y = sum(p[1] for p in self.pos_history) / len(self.pos_history)
+        n = len(self.pos_history)
+        if n == 1:
+            return pos
+
+        dx = pos[0] - self.pos_history[-2][0]
+        dy = pos[1] - self.pos_history[-2][1]
+        dist = math.hypot(dx, dy)
+
+        if dist > 25:
+            # Fast swipe: heavily prioritize latest frame for instant response
+            weights = [1.0 + i * 2.5 for i in range(n)]
+        else:
+            # Slow movement: smooth jitter reduction
+            weights = [1.0 + i * 0.8 for i in range(n)]
+
+        total_w = sum(weights)
+        avg_x = sum(p[0] * w for p, w in zip(self.pos_history, weights)) / total_w
+        avg_y = sum(p[1] * w for p, w in zip(self.pos_history, weights)) / total_w
         return (int(avg_x), int(avg_y))
 
     def draw_landmarks(self, frame, raw_landmarks):

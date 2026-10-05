@@ -249,10 +249,11 @@ function onHandResults(results) {
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     inputMode = 'HAND';
     updateInputBadge();
-    const landmarks = results.multiHandLandmarks[0];
-
-    const rawX = (1 - landmarks[8].x) * width; // Mirror X
-    const rawY = landmarks[8].y * height;
+    const margin = 0.05;
+    let normX = (1 - landmarks[8].x - margin) / (1 - 2 * margin);
+    let normY = (landmarks[8].y - margin) / (1 - 2 * margin);
+    const rawX = Math.max(0, Math.min(width, normX * width));
+    const rawY = Math.max(0, Math.min(height, normY * height));
 
     // Apply Exponential Moving Average (EMA) smoothing for perfect stability (alpha = 0.3)
     if (filterX === null) {

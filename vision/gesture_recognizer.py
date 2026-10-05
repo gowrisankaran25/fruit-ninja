@@ -24,8 +24,10 @@ class GestureRecognizer:
         self._swipe_history = []    # last N index positions
 
     def _finger_is_extended(self, lm, tip_idx, pip_idx):
-        """A finger is extended if its tip is higher (lower y) than pip."""
-        return lm[tip_idx][1] < lm[pip_idx][1]
+        """A finger is extended if distance from wrist (lm[0]) to tip is greater than to pip."""
+        d_tip = math.hypot(lm[tip_idx][0] - lm[0][0], lm[tip_idx][1] - lm[0][1])
+        d_pip = math.hypot(lm[pip_idx][0] - lm[0][0], lm[pip_idx][1] - lm[0][1])
+        return d_tip > d_pip * 1.15
 
     def _thumb_is_extended(self, lm):
         """Thumb: compare x distance from wrist; extended if tip farther."""

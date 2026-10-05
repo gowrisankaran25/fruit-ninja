@@ -14,9 +14,15 @@ class Camera:
         self.cap = cv2.VideoCapture(index)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        self.width = width
-        self.height = height
         self._ready = self.cap.isOpened()
+        if self._ready:
+            actual_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.width = actual_w if actual_w > 0 else width
+            self.height = actual_h if actual_h > 0 else height
+        else:
+            self.width = width
+            self.height = height
 
     @property
     def is_ready(self):
